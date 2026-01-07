@@ -126,7 +126,7 @@ private:
     }
   }
   
-  void flushFrame(byte* buffer, int& length, unsigned long lastTime, const char* prefix) {
+  void flushFrame(byte* buffer, int& length, const char* prefix) {
     if (length > 0) {
       if (BUS_MONITOR_ENABLED) {
         printHexData(buffer, length, prefix);
@@ -142,7 +142,7 @@ private:
     
     // Check if previous frame has timed out
     if (_frameLength > 0 && (currentTime - _lastByteTime) >= FRAME_TIMEOUT) {
-      flushFrame(_frameBuffer, _frameLength, _lastByteTime, "[RS-485]");
+      flushFrame(_frameBuffer, _frameLength, "[RS-485]");
     }
     
     // Add byte to frame buffer
@@ -152,8 +152,9 @@ private:
     } else {
       // Buffer overflow - flush and start new frame
       Serial.println("[WARNING] RX frame buffer overflow, flushing...");
-      flushFrame(_frameBuffer, _frameLength, _lastByteTime, "[RS-485]");
-      _frameBuffer[_frameLength++] = b;
+      flushFrame(_frameBuffer, _frameLength, "[RS-485]");
+      _frameBuffer[0] = b;
+      _frameLength = 1;
       _lastByteTime = currentTime;
     }
   }
@@ -165,7 +166,7 @@ private:
     
     // Check if previous TX frame has timed out and flush it
     if (_txFrameLength > 0 && (currentTime - _lastTxByteTime) >= FRAME_TIMEOUT) {
-      flushFrame(_txFrameBuffer, _txFrameLength, _lastTxByteTime, "[TX]");
+      flushFrame(_txFrameBuffer, _txFrameLength, "[TX]");
     }
     
     // Add byte to TX frame buffer
@@ -175,8 +176,9 @@ private:
     } else {
       // Buffer overflow - flush and start new frame
       Serial.println("[WARNING] TX frame buffer overflow, flushing...");
-      flushFrame(_txFrameBuffer, _txFrameLength, _lastTxByteTime, "[TX]");
-      _txFrameBuffer[_txFrameLength++] = b;
+      flushFrame(_txFrameBuffer, _txFrameLength, "[TX]");
+      _txFrameBuffer[0] = b;
+      _txFrameLength = 1;
       _lastTxByteTime = currentTime;
     }
   }
