@@ -101,15 +101,47 @@ private:
   byte _frameBuffer[MAX_FRAME_SIZE];
   int _frameLength;
   unsigned long _lastByteTime;
+  byte _txFrameBuffer[MAX_FRAME_SIZE];
+  int _txFrameLength;
+  unsigned long _lastTxByteTime;
   
   void checkFrameTimeout() {
     unsigned long currentTime = millis();
     if (_frameLength > 0 && (currentTime - _lastByteTime) >= FRAME_TIMEOUT) {
-      // Frame complete, print it
+      // RX Frame complete, print it
       if (BUS_MONITOR_ENABLED) {
         printHexData(_frameBuffer, _frameLength);
       }
       _frameLength = 0;
+    }
+    
+    // Also check TX frame timeout
+    if (_txFrameLength > 0 && (currentTime - _lastTxByteTime) >= FRAME_TIMEOUT) {
+      // TX Frame complete, print it
+      if (BUS_MONITOR_ENABLED) {
+        Serial.print("[TX] ");
+        Serial.print(_lastTxByteTime);
+        Serial.print(" ms | ");
+        Serial.print(_txFrameLength);
+        Serial.print(" bytes: ");
+        
+        for (int i = 0; i < _txFrameLength; i++) {
+          if (_txFrameBuffer[i] < 0x10) Serial.print("0");
+          Serial.print(_txFrameBuffer[i], HEX);
+          Serial.print(" ");
+        }
+        
+        Serial.print(" | ASCII: ");
+        for (int i = 0; i < _txFrameLength; i++) {
+          if (_txFrameBuffer[i] >= 32 && _txFrameBuffer[i] <= 126) {
+            Serial.write(_txFrameBuffer[i]);
+          } else {
+            Serial.print(".");
+          }
+        }
+        Serial.println();
+      }
+      _txFrameLength = 0;
     }
   }
   
@@ -131,8 +163,26 @@ private:
     }
   }
   
+  void logTxByte(byte b) {
+    if (!BUS_MONITOR_ENABLED) return;
+    
+    unsigned long currentTime = millis();
+    
+    // Check if previous TX frame has timed out
+    if (_txFrameLength > 0 && (currentTime - _lastTxByteTime) >= FRAME_TIMEOUT) {
+      checkFrameTimeout(); // This will print the TX frame
+    }
+    
+    // Add byte to TX frame buffer
+    if (_txFrameLength < MAX_FRAME_SIZE) {
+      _txFrameBuffer[_txFrameLength++] = b;
+      _lastTxByteTime = currentTime;
+    }
+  }
+  
 public:
-  MonitoredSerial(Stream* serial) : _serial(serial), _frameLength(0), _lastByteTime(0) {}
+  MonitoredSerial(Stream* serial) : _serial(serial), _frameLength(0), _lastByteTime(0), 
+                                     _txFrameLength(0), _lastTxByteTime(0) {}
   
   // Stream methods that must be implemented
   int available() override {
@@ -154,12 +204,7 @@ public:
   
   // Print methods for writing
   size_t write(uint8_t b) override {
-    // Also log transmitted data
-    if (BUS_MONITOR_ENABLED) {
-      Serial.print("[TX] ");
-      if (b < 0x10) Serial.print("0");
-      Serial.println(b, HEX);
-    }
+    logTxByte(b);
     return _serial->write(b);
   }
   
