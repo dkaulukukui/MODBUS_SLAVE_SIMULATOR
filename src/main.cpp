@@ -25,6 +25,7 @@
 // MODBUS Configuration
 const int SLAVE_ID = 1;           // Modbus Slave ID
 const long SERIAL_BAUD = 9600;    // Serial baud rate
+const int SERIAL_CONFIG = SERIAL_8E1;  // 8 data bits, Even parity, 1 stop bit
 const int TXEN_PIN = -1;          // Transmit enable pin for RS485 (-1 if not used)
 
 // Create Modbus Serial instance
@@ -109,14 +110,17 @@ void setup() {
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
   
+  // Seed random number generator for sensor simulation
+  randomSeed(analogRead(0));
+  
   // Initialize serial communication for MODBUS
-  Serial.begin(SERIAL_BAUD, SERIAL_8E1); // 8 data bits, Even parity, 1 stop bit
+  Serial.begin(SERIAL_BAUD, SERIAL_CONFIG);
   
   // Wait for serial port to be ready
   delay(100);
   
   // Configure MODBUS slave
-  mb.config(&Serial, SERIAL_BAUD, SERIAL_8E1, TXEN_PIN);
+  mb.config(&Serial, SERIAL_BAUD, SERIAL_CONFIG, TXEN_PIN);
   mb.setSlaveId(SLAVE_ID);
   
   // Initialize simulated data
