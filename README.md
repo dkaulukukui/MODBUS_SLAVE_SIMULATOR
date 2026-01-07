@@ -71,27 +71,72 @@ Serial configuration:
 
 The bus monitor captures ALL data transmitted on the RS-485 bus and echoes it to the USB Serial port in real-time. This includes:
 
-- **Modbus frames addressed to this slave** - Will be processed normally
-- **Modbus frames addressed to other slaves** - Captured for monitoring only
+- **Modbus frames addressed to this slave** - Will be processed normally AND monitored
+- **Modbus frames addressed to other slaves** - Captured for monitoring only (not processed)
 - **Non-Modbus data** - Any data on the bus (e.g., ASCII protocols)
 
 ### Monitoring Output Format
 
 ```
+=== MODBUS RTU Slave Simulator with Bus Monitor ===
+Slave ID: 1
+Bus Monitor: ENABLED
+================================================
+
 [RS-485] 1234 ms | 8 bytes: 01 03 00 00 00 0A C5 CD | ASCII: ........
-[RS-485] 1245 ms | 23 bytes: 01 03 14 00 00 00 01 ... | ASCII: ........
+[TX] 1245 ms | 23 bytes: 01 03 14 00 00 00 01 03 E8 ... | ASCII: ..........
+[RS-485] 2300 ms | 8 bytes: 02 03 00 00 00 05 85 F9 | ASCII: ........
+[RS-485] 3456 ms | 9 bytes: 3E 30 30 31 0D 0A | ASCII: >001..
 ```
 
 Each line shows:
-- Timestamp in milliseconds
-- Number of bytes captured
-- Hex representation of the data
-- ASCII representation (printable characters shown, others as '.')
+- **[RS-485]** or **[TX]** prefix (received vs transmitted data)
+- **Timestamp** in milliseconds since startup
+- **Byte count** of the captured frame
+- **Hex representation** of all bytes (space separated)
+- **ASCII representation** (printable characters shown, others as '.')
+
+### Example Scenarios
+
+#### Scenario 1: Modbus Master Querying This Slave
+```
+[RS-485] 5123 ms | 8 bytes: 01 03 00 00 00 0A C5 CD | ASCII: ........
+[TX] 5156 ms | 23 bytes: 01 03 14 03 E8 04 4C ... | ASCII: ........
+```
+The slave receives a Modbus Read Holding Registers request (function 0x03) and responds with data.
+
+#### Scenario 2: Multi-Drop Network with Multiple Slaves
+```
+[RS-485] 8001 ms | 8 bytes: 01 03 00 00 00 0A C5 CD | ASCII: ........
+[TX] 8034 ms | 23 bytes: 01 03 14 03 E8 04 4C ... | ASCII: ........
+[RS-485] 8200 ms | 8 bytes: 02 03 00 00 00 05 85 F9 | ASCII: ........
+```
+Master queries slave 1 (this device responds), then queries slave 2 (captured but not processed).
+
+#### Scenario 3: Non-Modbus ASCII Protocol
+```
+[RS-485] 12456 ms | 6 bytes: 3E 30 30 31 0D 0A | ASCII: >001..
+[RS-485] 12500 ms | 15 bytes: 30 30 31 2C 31 32 33 2E 34 35 0D 0A | ASCII: 001,123.45..
+```
+An ASCII polling protocol is captured and displayed alongside Modbus traffic.
+
+### Using the Monitor
 
 To view the monitoring output, connect to the USB Serial port at 115200 baud:
 ```bash
 pio device monitor --baud 115200
 ```
+
+Or use any serial terminal:
+```bash
+# Linux/Mac
+screen /dev/ttyACM0 115200
+
+# Or using minicom
+minicom -D /dev/ttyACM0 -b 115200
+```
+
+**Note**: The monitoring output is on the Feather's USB port (typically `/dev/ttyACM0`), while Modbus communication happens on the RS-485 adapter port (typically `/dev/ttyUSB0`).
 
 ## Installation & Setup
 
