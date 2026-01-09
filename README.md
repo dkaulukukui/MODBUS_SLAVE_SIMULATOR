@@ -1,124 +1,122 @@
-# MODBUS_SLAVE_SIMULATOR
+# HMP110 MODBUS RTU Slave Simulator
 
-A PlatformIO project that implements a MODBUS RTU slave device on an Adafruit Feather M0 Express microcontroller. The device responds to all supported MODBUS functions with simulated data, making it ideal for testing MODBUS master devices and applications.
+A PlatformIO project that simulates a Vaisala HMP110 temperature and humidity sensor on an Adafruit Feather M0 Express microcontroller. The device responds to MODBUS RTU requests with simulated temperature and humidity data, making it ideal for testing MODBUS master devices and applications that work with HMP110 sensors.
 
 ## Features
 
-- **Full MODBUS RTU Slave Support**: Implements all 9 MODBUS functions supported by the modbus-arduino library
-- **RS-485 Bus Monitor**: Captures and displays ALL data on the RS-485 bus in real-time
-  - Monitors Modbus frames addressed to ANY slave (not just this device)
-  - Monitors non-Modbus data types (e.g., polled ASCII protocols)
-  - Echoes all bus traffic to USB Serial for debugging
-  - Displays data in both hex and ASCII formats with timestamps
-- **Simulated Data**: Provides realistic simulated sensor and control data
-- **Dynamic Updates**: Simulated input values change over time to mimic real sensors
-- **Visual Feedback**: Built-in LED indicates system activity
+- **HMP110 Sensor Emulation**: Accurately simulates Vaisala HMP110 temperature and humidity sensor
+- **IEEE 754 Float Encoding**: Uses proper 32-bit floating-point format (little-endian) for sensor values
+- **Direct UART Connection**: Simple TX/RX connection, no RS-485 transceiver needed
+- **Realistic Simulation**: Temperature and humidity values drift over time to mimic real sensor behavior
+- **USB Serial Monitoring**: Displays request count, uptime, and current sensor values
+- **Visual Feedback**: Built-in LED flashes on each MODBUS request
 
 ## Hardware Requirements
 
 - **Adafruit Feather M0 Express** (ATSAMD21G18 ARM Cortex M0 processor)
-- **RS-485 Module** (required for bus monitoring)
-  - Connect RS-485 module to Serial1 pins (TX/RX on Feather M0)
-  - If using RS-485, connect the module's TX enable pin and update `TXEN_PIN` in the code
-- **USB Cable** for programming and viewing bus monitoring output
+- **Direct UART Connection** to MODBUS master
+  - Connect Feather TX1 (pin 1) to master RX
+  - Connect Feather RX1 (pin 0) to master TX
+  - Connect GND to GND
+- **USB Cable** for programming and viewing monitoring output
+- **No RS-485 transceiver needed** - uses direct UART communication
 
 ## Supported MODBUS Functions
 
-The slave device responds to all standard MODBUS RTU functions:
+The HMP110 simulator supports standard MODBUS holding register operations:
 
-| Function Code | Function Name | Description | Register Type |
-|--------------|---------------|-------------|---------------|
-| 0x01 | Read Coils | Read digital outputs (R/W) | Coils (10 available) |
-| 0x02 | Read Discrete Inputs | Read digital inputs (R/O) | Discrete Inputs (10 available) |
-| 0x03 | Read Holding Registers | Read analog outputs/storage (R/W) | Holding Registers (10 available) |
-| 0x04 | Read Input Registers | Read analog inputs (R/O) | Input Registers (10 available) |
-| 0x05 | Write Single Coil | Write one digital output | Coils |
-| 0x06 | Write Single Register | Write one analog output | Holding Registers |
-| 0x0F | Write Multiple Coils | Write multiple digital outputs | Coils |
-| 0x10 | Write Multiple Registers | Write multiple analog outputs | Holding Registers |
-| 0x11 | Report Server ID | Get slave identification | - |
+| Function Code | Function Name | Description |
+|--------------|---------------|-------------|
+| 0x03 | Read Holding Registers | Read temperature and humidity values |
+| 0x06 | Write Single Register | Write to holding register (register values preserved) |
+| 0x10 | Write Multiple Registers | Write to multiple holding registers |
 
-## Simulated Data
+## HMP110 Register Map
 
-### Coils (Address 0-9)
-Digital outputs that can be read and written. Initially set in an alternating pattern (ON, OFF, ON, OFF...).
+The simulator implements the HMP110's register layout with IEEE 754 32-bit floating-point values in little-endian byte order:
 
-### Discrete Inputs (Address 0-9)
-Read-only digital inputs simulating buttons or switches. Values change randomly over time. Initially set in a pattern where every third input is ON.
+| Register Address | Parameter | Data Type | Units | Range |
+|-----------------|-----------|-----------|-------|-------|
+| 0x0000-0x0001 | Relative Humidity | 32-bit float (little-endian) | %RH | 30.0 - 70.0 |
+| 0x0002-0x0003 | Temperature | 32-bit float (little-endian) | °C | 20.0 - 30.0 |
 
-### Holding Registers (Address 0-9)
-16-bit registers that can be read and written. Initial values: 1000, 1100, 1200, 1300, etc.
+**Note**: Each parameter occupies 2 consecutive 16-bit registers (32 bits total for the IEEE 754 float).
 
-### Input Registers (Address 0-9)
-Read-only 16-bit registers simulating sensor data. Initial values: 2000, 2050, 2100, 2150, etc. Values change slightly over time to simulate real sensor readings.
+### Reading Float Values
+
+When reading from MODBUS, you'll receive two 16-bit registers per parameter. To decode:
+1. Read 2 registers (e.g., 0x0000 and 0x0001 for humidity)
+2. Combine as: `value = (MSW << 16) | LSW` (where LSW is first register, MSW is second)
+3. Interpret the 32-bit value as an IEEE 754 float
+
+## Simulated Sensor Behavior
+
+The simulator provides realistic sensor readings:
+
+- **Initial Values**: 
+  - Humidity: 50.0 %RH
+  - Temperature: 25.0 °C
+
+- **Dynamic Updates**: Values change every 2 seconds with realistic drift
+  - Humidity varies randomly by ±1.0 %RH per update
+  - Temperature varies randomly by ±0.5 °C per update
+  - Values are constrained to realistic ranges (30-70 %RH, 20-30 °C)
+
+This mimics the behavior of a real HMP110 sensor in a stable environment with small natural variations.
 
 ## Configuration
 
-Default MODBUS settings (can be modified in `src/main.cpp`):
+HMP110 MODBUS settings (configured in `src/main.cpp`):
 
 ```cpp
-const int SLAVE_ID = 1;           // MODBUS Slave ID
-const long SERIAL_BAUD = 9600;    // Serial baud rate (for RS-485/Serial1)
-const int TXEN_PIN = -1;          // RS-485 TX enable pin (-1 if not used)
-const bool BUS_MONITOR_ENABLED = true;  // Enable/disable bus monitoring
+const int SLAVE_ID = 240;                    // HMP110 default address (0xF0)
+const long SERIAL_BAUD = 115200;             // HMP110 baud rate
+const uint16_t SERIAL_CONFIG = SERIAL_8N2;   // 8 data bits, No parity, 2 stop bits
 ```
 
-Serial configuration:
-- **RS-485 (Serial1)**: 9600 baud, 8 data bits, Even parity, 1 stop bit (8E1)
-- **USB (Serial)**: 115200 baud for monitoring output
+Serial ports:
+- **Serial1 (TX1/RX1 pins)**: MODBUS RTU communication at 115200 baud, 8N2
+- **USB Serial**: Monitoring output at 115200 baud
 
-## Bus Monitoring
+## USB Serial Monitoring
 
-The bus monitor captures ALL data transmitted on the RS-485 bus and echoes it to the USB Serial port in real-time. This includes:
+The simulator outputs status information to the USB Serial port (at 115200 baud). This includes:
 
-- **Modbus frames addressed to this slave** - Will be processed normally AND monitored
-- **Modbus frames addressed to other slaves** - Captured for monitoring only (not processed)
-- **Non-Modbus data** - Any data on the bus (e.g., ASCII protocols)
+- Startup information and configuration
+- Register map layout
+- Current sensor values at startup
+- Request counter and sensor values for each MODBUS request received
+- Heartbeat messages every 10 seconds showing uptime, request count, and current values
 
 ### Monitoring Output Format
 
 ```
-=== MODBUS RTU Slave Simulator with Bus Monitor ===
-Slave ID: 1
-Bus Monitor: ENABLED
-================================================
+╔═══════════════════════════════════════════════╗
+║   HMP110 MODBUS RTU SLAVE (Direct UART)      ║
+╚═══════════════════════════════════════════════╝
 
-[RS-485] 1234 ms | 8 bytes: 01 03 00 00 00 0A C5 CD | ASCII: ........
-[TX] 1245 ms | 23 bytes: 01 03 14 00 00 00 01 03 E8 ... | ASCII: ..........
-[RS-485] 2300 ms | 8 bytes: 02 03 00 00 00 05 85 F9 | ASCII: ........
-[RS-485] 3456 ms | 9 bytes: 3E 30 30 31 0D 0A | ASCII: >001..
-```
+Slave Address: 240 (0xF0)
+Baud Rate: 115200
+Config: 8N2
+Connection: TX1->RX(master), RX1->TX(master)
 
-Each line shows:
-- **[RS-485]** or **[TX]** prefix (received vs transmitted data)
-- **Timestamp** in milliseconds since startup
-- **Byte count** of the captured frame
-- **Hex representation** of all bytes (space separated)
-- **ASCII representation** (printable characters shown, others as '.')
+Starting MODBUS RTU Server on Serial1...
+✓ MODBUS server started
 
-### Example Scenarios
+Register Map:
+  0x0000-0x0001: Humidity (32-bit float, little-endian)
+  0x0002-0x0003: Temperature (32-bit float, little-endian)
 
-#### Scenario 1: Modbus Master Querying This Slave
-```
-[RS-485] 5123 ms | 8 bytes: 01 03 00 00 00 0A C5 CD | ASCII: ........
-[TX] 5156 ms | 23 bytes: 01 03 14 03 E8 04 4C ... | ASCII: ........
-```
-The slave receives a Modbus Read Holding Registers request (function 0x03) and responds with data.
+Initial: RH=50.00 %RH, T=25.00 °C
 
-#### Scenario 2: Multi-Drop Network with Multiple Slaves
-```
-[RS-485] 8001 ms | 8 bytes: 01 03 00 00 00 0A C5 CD | ASCII: ........
-[TX] 8034 ms | 23 bytes: 01 03 14 03 E8 04 4C ... | ASCII: ........
-[RS-485] 8200 ms | 8 bytes: 02 03 00 00 00 05 85 F9 | ASCII: ........
-```
-Master queries slave 1 (this device responds), then queries slave 2 (captured but not processed).
+═══════════════════════════════════════════════
+✓ Ready! Listening for MODBUS requests...
+═══════════════════════════════════════════════
 
-#### Scenario 3: Non-Modbus ASCII Protocol
+📡 Request #1 @ 1234 ms - RH=50.12 %RH, T=25.23 °C
+📡 Request #2 @ 3456 ms - RH=50.34 %RH, T=25.18 °C
+Heartbeat - Uptime: 10s, Requests: 2, RH=50.45 %RH, T=25.31 °C
 ```
-[RS-485] 12456 ms | 6 bytes: 3E 30 30 31 0D 0A | ASCII: >001..
-[RS-485] 12500 ms | 15 bytes: 30 30 31 2C 31 32 33 2E 34 35 0D 0A | ASCII: 001,123.45..
-```
-An ASCII polling protocol is captured and displayed alongside Modbus traffic.
 
 ### Using the Monitor
 
@@ -136,7 +134,7 @@ screen /dev/ttyACM0 115200
 minicom -D /dev/ttyACM0 -b 115200
 ```
 
-**Note**: The monitoring output is on the Feather's USB port (typically `/dev/ttyACM0`), while Modbus communication happens on the RS-485 adapter port (typically `/dev/ttyUSB0`).
+**Note**: The USB Serial port shows monitoring output (typically `/dev/ttyACM0`), while MODBUS communication happens on Serial1 through direct TX1/RX1 connections to your MODBUS master device.
 
 ## Installation & Setup
 
@@ -158,13 +156,15 @@ pio run
 # Upload to the Feather M0 Express
 pio run --target upload
 
-# Monitor serial output (view bus monitoring data)
+# Monitor serial output (view status and sensor values)
 pio device monitor --baud 115200
 ```
 
-**Note**: The Modbus communication happens on Serial1 (TX/RX pins), while monitoring output is on USB Serial. You'll need two connections:
-1. RS-485 module connected to TX/RX pins for Modbus communication
-2. USB cable for monitoring output
+**Wiring**:
+- Connect Feather TX1 (pin 1) to your MODBUS master's RX
+- Connect Feather RX1 (pin 0) to your MODBUS master's TX  
+- Connect GND to GND
+- USB cable provides power and monitoring output
 
 ### VS Code with PlatformIO Extension
 
@@ -174,82 +174,96 @@ pio device monitor --baud 115200
 4. Click the "Upload" button (arrow) to flash the device
 5. Open Serial Monitor at 115200 baud to view bus monitoring
 
-## Testing the MODBUS Slave
+## Testing the HMP110 Simulator
 
-### Important: Serial Port Configuration
+### Important: Connection Setup
 
-The Feather M0 Express has two serial ports:
-- **Serial1 (TX/RX pins)**: Used for RS-485/Modbus communication
-- **USB Serial**: Used for monitoring output only
+The Feather M0 Express connects directly to your MODBUS master via UART:
+- **Serial1 (TX1/RX1 pins)**: MODBUS RTU communication at 115200 baud, 8N2
+- **USB Serial**: Monitoring output only
 
-When using Modbus tools like `mbpoll`, you need to:
-1. Connect your RS-485 adapter to the Feather's TX/RX pins (Serial1)
-2. Connect your RS-485 adapter to your computer
-3. Use the RS-485 adapter's serial port (NOT the Feather's USB port) with mbpoll
+**Wiring**:
+1. Connect Feather TX1 (pin 1) to MODBUS master RX
+2. Connect Feather RX1 (pin 0) to MODBUS master TX
+3. Connect GND to GND
 
 ### Using mbpoll (Command Line)
 
-Install [mbpoll](https://github.com/epsilonrt/mbpoll) and test the slave:
+Install [mbpoll](https://github.com/epsilonrt/mbpoll) and test the HMP110 simulator:
 
 ```bash
-# Replace /dev/ttyUSB0 with your RS-485 adapter's port
-# (NOT /dev/ttyACM0 which is the Feather's USB port)
+# Configure your MODBUS master serial port for:
+# - 115200 baud
+# - 8 data bits, No parity, 2 stop bits (8N2)
+# - Slave address 240 (0xF0)
 
-# Read 5 coils starting at address 0
-mbpoll -m rtu -b 9600 -a 1 -t 0 -r 1 -c 5 /dev/ttyUSB0
+# Read humidity (2 registers starting at address 0x0000)
+mbpoll -m rtu -b 115200 -a 240 -P none -s 2 -t 4 -r 0 -c 2 /dev/ttyUSB0
 
-# Read 5 holding registers starting at address 0
-mbpoll -m rtu -b 9600 -a 1 -t 4 -r 1 -c 5 /dev/ttyUSB0
+# Read temperature (2 registers starting at address 0x0002)
+mbpoll -m rtu -b 115200 -a 240 -P none -s 2 -t 4 -r 2 -c 2 /dev/ttyUSB0
 
-# Write value 1234 to holding register at address 0
-mbpoll -m rtu -b 9600 -a 1 -t 4 -r 1 /dev/ttyUSB0 1234
-
-# Read 5 input registers starting at address 0
-mbpoll -m rtu -b 9600 -a 1 -t 3 -r 1 -c 5 /dev/ttyUSB0
-
-# Read 5 discrete inputs starting at address 0
-mbpoll -m rtu -b 9600 -a 1 -t 1 -r 1 -c 5 /dev/ttyUSB0
+# Read both humidity and temperature (4 registers starting at address 0x0000)
+mbpoll -m rtu -b 115200 -a 240 -P none -s 2 -t 4 -r 0 -c 4 /dev/ttyUSB0
 ```
 
-While running these commands, watch the USB Serial output to see all bus traffic being captured and displayed!
+**Note**: Replace `/dev/ttyUSB0` with your actual MODBUS master serial port. The `-P none -s 2` flags specify No parity and 2 stop bits (8N2).
+
+While running these commands, watch the USB Serial output (on the Feather) to see request counts and current sensor values!
 
 ### Using QModMaster (GUI)
 
 1. Download and install [QModMaster](https://sourceforge.net/projects/qmodmaster/)
 2. Configure connection:
    - Mode: RTU
-   - Port: Select your RS-485 adapter port (NOT the Feather USB port)
-   - Baud: 9600
-   - Parity: Even
+   - Port: Select your MODBUS master serial port
+   - Baud: 115200
+   - Parity: None
    - Data bits: 8
-   - Stop bits: 1
-   - Slave ID: 1
-3. Test reading and writing different register types
-4. Monitor the Feather's USB Serial (at 115200 baud) to see all captured bus traffic
+   - Stop bits: 2
+   - Slave ID: 240
+3. Read holding registers:
+   - Start address: 0
+   - Number of registers: 4
+   - You'll see the raw register values (need to decode as IEEE 754 floats)
+4. Monitor the Feather's USB Serial (at 115200 baud) to see request count and decoded sensor values
 
 ### Using Python pymodbus
 
 ```python
 from pymodbus.client import ModbusSerialClient
+import struct
 
-# Create client - use your RS-485 adapter's port
+# Create client for HMP110 simulator
 client = ModbusSerialClient(
-    port='/dev/ttyUSB0',  # Your RS-485 adapter, NOT /dev/ttyACM0
-    baudrate=9600,
-    parity='E',
-    stopbits=1,
+    port='/dev/ttyUSB0',  # Your MODBUS master serial port
+    baudrate=115200,
+    parity='N',           # No parity
+    stopbits=2,           # 2 stop bits
     bytesize=8
 )
 
 # Connect
 client.connect()
 
-# Read 5 holding registers starting at address 0
-result = client.read_holding_registers(address=0, count=5, slave=1)
-print(result.registers)
+# Read all 4 holding registers (humidity + temperature)
+result = client.read_holding_registers(address=0, count=4, slave=240)
 
-# Write to holding register
-client.write_register(address=0, value=5000, slave=1)
+if result.isError():
+    print("Error reading registers")
+else:
+    registers = result.registers
+    
+    # Decode humidity (registers 0-1, little-endian)
+    humidity_bytes = struct.pack('<HH', registers[0], registers[1])
+    humidity = struct.unpack('<f', humidity_bytes)[0]
+    
+    # Decode temperature (registers 2-3, little-endian)
+    temp_bytes = struct.pack('<HH', registers[2], registers[3])
+    temperature = struct.unpack('<f', temp_bytes)[0]
+    
+    print(f"Humidity: {humidity:.2f} %RH")
+    print(f"Temperature: {temperature:.2f} °C")
 
 # Close connection
 client.close()
@@ -263,23 +277,23 @@ client.close()
 - Check that the correct port is selected
 
 ### Communication Issues
-- Verify baud rate, parity, and stop bits match on master and slave
-- Check slave ID matches (default is 1)
-- Ensure proper RS-485 connections if using external transceiver
-- For RS-485, verify TX enable pin is correctly configured
+- Verify baud rate is 115200 with 8N2 (8 data bits, no parity, 2 stop bits)
+- Check slave ID is 240 (0xF0)
+- Ensure direct UART connections: TX1->RX(master), RX1->TX(master), GND->GND
+- Verify the MODBUS master is configured for the correct serial port
 
 ### LED Behavior
-- **Three quick flashes at startup**: Successful initialization
-- **Slow blinking**: Normal operation (updates every second)
-- **No LED activity**: Check power and upload
+- **Five quick flashes at startup**: Successful initialization
+- **Brief flash on each MODBUS request**: Request received and processed
+- **No LED activity**: Check power, upload, or MODBUS configuration
 
 ## Library Credits
 
-This project uses the [modbus-arduino](https://github.com/epsilonrt/modbus-arduino) library by epsilonrt.
+This project uses the [ArduinoModbus](https://github.com/arduino-libraries/ArduinoModbus) library by Arduino.
 
 ## License
 
-This project follows the same license as the modbus-arduino library (BSD License).
+This project follows the same license as the ArduinoModbus library.
 
 ## Contributing
 
