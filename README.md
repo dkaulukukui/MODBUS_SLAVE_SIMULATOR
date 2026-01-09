@@ -45,10 +45,10 @@ The simulator implements the HMP110's register layout with IEEE 754 32-bit float
 ### Reading Float Values
 
 When reading from MODBUS, you'll receive two 16-bit registers per parameter. To decode:
-1. Read 2 registers (e.g., 0x0000 and 0x0001 for humidity)
-2. Register 0 contains the low word (LSW), Register 1 contains the high word (MSW)
-3. Combine as: `value = (register[1] << 16) | register[0]`
-4. Interpret the 32-bit value as an IEEE 754 float (little-endian)
+1. Read 2 registers (e.g., addresses 0x0000 and 0x0001 for humidity)
+2. The first register (address 0x0000) contains the low word (bits 0-15)
+3. The second register (address 0x0001) contains the high word (bits 16-31)
+4. Decode using little-endian IEEE 754 format (see Python example below)
 
 ## Simulated Sensor Behavior
 
