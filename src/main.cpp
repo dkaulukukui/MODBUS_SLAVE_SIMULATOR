@@ -3,8 +3,8 @@
  * 
  * Simulates 3 sensors on shared RS-485 bus:
  * 1. HMP110 - MODBUS RTU at address 0xF0 (humidity & temperature)
- * 2. Young 41342VC #1 - ASCII polling at address 'A' (wind data)
- * 3. Young 41342VC #2 - ASCII polling at address 'B' (wind data)
+ * 2. Young 41342VC #1 - ASCII polling at address 'A' (temperature)
+ * 3. Young 41342VC #2 - ASCII polling at address 'B' (temperature)
  * 
  * KEY FIX: Manually handles Modbus requests instead of using ArduinoModbus
  *          library so we can also detect ASCII commands on the same serial line
@@ -35,11 +35,10 @@ struct HMP110Data {
 } hmp110 = {50.5, 25.2};
 
 struct YoungData {
-  float windSpeed;       // m/s
-  float windDirection;   // degrees
+  float temperature;     // °C
   uint16_t vin1, vin2, vin3, vin4;  // Voltage inputs
-} young1 = {5.2, 180.0, 1250, 2350, 0, 0};
-struct YoungData young2 = {3.8, 90.0, 1150, 2200, 0, 0};
+} young1 = {22.5, 1250, 2350, 0, 0};
+struct YoungData young2 = {23.8, 1150, 2200, 0, 0};
 
 // Request counters
 unsigned long modbusRequestCount = 0;
@@ -190,13 +189,11 @@ void handleASCIIPoll(char address) {
     return;  // Unknown address
   }
   
-  // Build response: a,WS,WD,VIN1,VIN2,VIN3,VIN4<CR><LF>
+  // Build response: a,T,VIN1,VIN2,VIN3,VIN4<CR><LF>
   String response = "";
   response += address;
   response += ",";
-  response += String(sensor->windSpeed, 1);
-  response += ",";
-  response += String(sensor->windDirection, 1);
+  response += String(sensor->temperature, 2);
   response += ",";
   response += String(sensor->vin1);
   response += ",";
@@ -212,11 +209,9 @@ void handleASCIIPoll(char address) {
   Serial1.flush();
   
   // Log
-  Serial.print(" - WS=");
-  Serial.print(sensor->windSpeed, 1);
-  Serial.print(" m/s, WD=");
-  Serial.print(sensor->windDirection, 1);
-  Serial.println("°");
+  Serial.print(" - T=");
+  Serial.print(sensor->temperature, 2);
+  Serial.println(" °C");
   
   // Flash LED
   digitalWrite(LED_PIN, HIGH);
@@ -283,19 +278,13 @@ void updateSimulatedValues() {
   hmp110.humidity = constrain(hmp110.humidity, 30.0, 70.0);
   hmp110.temperature = constrain(hmp110.temperature, 20.0, 30.0);
   
-  // Young #1: Simulate wind changes
-  young1.windSpeed += (random(-20, 21) / 10.0);
-  young1.windDirection += (random(-10, 11));
-  young1.windSpeed = constrain(young1.windSpeed, 0.0, 20.0);
-  if (young1.windDirection < 0) young1.windDirection += 360;
-  if (young1.windDirection >= 360) young1.windDirection -= 360;
+  // Young #1: Simulate temperature changes
+  young1.temperature += (random(-5, 6) / 10.0);
+  young1.temperature = constrain(young1.temperature, 20.0, 30.0);
   
-  // Young #2: Simulate wind changes
-  young2.windSpeed += (random(-15, 16) / 10.0);
-  young2.windDirection += (random(-15, 16));
-  young2.windSpeed = constrain(young2.windSpeed, 0.0, 15.0);
-  if (young2.windDirection < 0) young2.windDirection += 360;
-  if (young2.windDirection >= 360) young2.windDirection -= 360;
+  // Young #2: Simulate temperature changes (different range)
+  young2.temperature += (random(-5, 6) / 10.0);
+  young2.temperature = constrain(young2.temperature, 20.0, 30.0);
   
   // Update voltage inputs
   young1.vin1 = constrain(young1.vin1 + random(-50, 51), 1000, 1500);
@@ -342,16 +331,12 @@ void setup() {
   Serial.print(" %RH, T=");
   Serial.print(hmp110.temperature, 2);
   Serial.println(" °C");
-  Serial.print("  Young #1: WS=");
-  Serial.print(young1.windSpeed, 1);
-  Serial.print(" m/s, WD=");
-  Serial.print(young1.windDirection, 1);
-  Serial.println("°");
-  Serial.print("  Young #2: WS=");
-  Serial.print(young2.windSpeed, 1);
-  Serial.print(" m/s, WD=");
-  Serial.print(young2.windDirection, 1);
-  Serial.println("°");
+  Serial.print("  Young #1: T=");
+  Serial.print(young1.temperature, 2);
+  Serial.println(" °C");
+  Serial.print("  Young #2: T=");
+  Serial.print(young2.temperature, 2);
+  Serial.println(" °C");
   Serial.println();
   
   Serial.println("════════════════════════════════════════════════");
@@ -400,11 +385,11 @@ void loop() {
     Serial.print(hmp110.humidity, 1);
     Serial.print("%, T=");
     Serial.print(hmp110.temperature, 1);
-    Serial.print("C, WS1=");
-    Serial.print(young1.windSpeed, 1);
-    Serial.print("m/s, WS2=");
-    Serial.print(young2.windSpeed, 1);
-    Serial.println("m/s");
+    Serial.print("C, T1=");
+    Serial.print(young1.temperature, 1);
+    Serial.print("C, T2=");
+    Serial.print(young2.temperature, 1);
+    Serial.println("C");
     Serial.println("───────────────────────────────────");
     Serial.println();
   }

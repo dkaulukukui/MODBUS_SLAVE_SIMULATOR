@@ -60,10 +60,10 @@ bool Young41342VC::receiveResponse(char* buffer, size_t bufferSize, uint16_t tim
   return true;
 }
 
-bool Young41342VC::parseResponse(const char* response, float& windSpeed, float& windDirection,
+bool Young41342VC::parseResponse(const char* response, float& temperature,
                                   uint16_t& vin1, uint16_t& vin2, uint16_t& vin3, uint16_t& vin4) {
-  // Expected format: a,WS,WD,VIN1,VIN2,VIN3,VIN4
-  // Example: A,12.5,245.3,1234,2345,3456,4000
+  // Expected format: a,T,VIN1,VIN2,VIN3,VIN4
+  // Example: A,22.50,1234,2345,3456,4000
   
   // Verify first character matches our address
   if (response[0] != _address) {
@@ -76,19 +76,8 @@ bool Young41342VC::parseResponse(const char* response, float& windSpeed, float& 
   const char* ptr = response + 1;
   if (*ptr == ',') ptr++;  // Skip comma after address
   
-  // Parse wind speed
-  windSpeed = atof(ptr);
-  
-  // Find next comma
-  ptr = strchr(ptr, ',');
-  if (!ptr) {
-    _lastError = ERROR_PARSE;
-    return false;
-  }
-  ptr++;  // Skip comma
-  
-  // Parse wind direction
-  windDirection = atof(ptr);
+  // Parse temperature
+  temperature = atof(ptr);
   
   // Find next comma
   ptr = strchr(ptr, ',');
@@ -138,7 +127,7 @@ bool Young41342VC::parseResponse(const char* response, float& windSpeed, float& 
   return true;
 }
 
-bool Young41342VC::readAllData(float& windSpeed, float& windDirection,
+bool Young41342VC::readAllData(float& temperature,
                                 uint16_t& vin1, uint16_t& vin2, uint16_t& vin3, uint16_t& vin4,
                                 uint16_t timeout_ms) {
   // Send polling command
@@ -154,11 +143,11 @@ bool Young41342VC::readAllData(float& windSpeed, float& windDirection,
   }
   
   // Parse response
-  return parseResponse(buffer, windSpeed, windDirection, vin1, vin2, vin3, vin4);
+  return parseResponse(buffer, temperature, vin1, vin2, vin3, vin4);
 }
 
-bool Young41342VC::readWind(float& windSpeed, float& windDirection, uint16_t timeout_ms) {
-  // Simplified version - just get wind data, ignore voltage inputs
+bool Young41342VC::readTemperature(float& temperature, uint16_t timeout_ms) {
+  // Simplified version - just get temperature, ignore voltage inputs
   uint16_t vin1, vin2, vin3, vin4;
-  return readAllData(windSpeed, windDirection, vin1, vin2, vin3, vin4, timeout_ms);
+  return readAllData(temperature, vin1, vin2, vin3, vin4, timeout_ms);
 }

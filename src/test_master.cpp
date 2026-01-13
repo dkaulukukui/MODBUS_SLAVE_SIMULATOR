@@ -2,9 +2,9 @@
  * Master Test Program for Multi-Sensor Simulator
  * 
  * Tests all three sensors:
- * - HMP110 at Modbus address 0xF0 (Binary Modbus RTU)
- * - Young #1 at ASCII address 'A' (ASCII polling)
- * - Young #2 at ASCII address 'B' (ASCII polling)
+ * - HMP110 at Modbus address 0xF0 (Binary Modbus RTU) - Humidity & Temperature
+ * - Young #1 at ASCII address 'A' (ASCII polling) - Temperature
+ * - Young #2 at ASCII address 'B' (ASCII polling) - Temperature
  * 
  * Connect to simulator:
  *   TX2 (pin 11) -> RX1 of simulator
@@ -41,8 +41,7 @@ struct HMP110Data {
 
 struct YoungData {
   bool valid;
-  float windSpeed;
-  float windDirection;
+  float temperature;
   uint16_t vin1, vin2, vin3, vin4;
   unsigned long lastReadTime;
 } young1, young2;
@@ -148,9 +147,9 @@ void readAllSensors() {
     Serial2.read();
   }
   
-  // Read Young sensor #1 (wind data via ASCII polling)
+  // Read Young sensor #1 (temperature via ASCII polling)
   Serial.print("Reading Young #1 (ASCII 'A')...");
-  if (young1Sensor.readAllData(young1.windSpeed, young1.windDirection,
+  if (young1Sensor.readAllData(young1.temperature,
                                 young1.vin1, young1.vin2, young1.vin3, young1.vin4)) {
     young1.valid = true;
     young1.lastReadTime = millis();
@@ -163,9 +162,9 @@ void readAllSensors() {
   
   delay(150);
   
-  // Read Young sensor #2 (wind data via ASCII polling)
+  // Read Young sensor #2 (temperature via ASCII polling)
   Serial.print("Reading Young #2 (ASCII 'B')...");
-  if (young2Sensor.readAllData(young2.windSpeed, young2.windDirection,
+  if (young2Sensor.readAllData(young2.temperature,
                                 young2.vin1, young2.vin2, young2.vin3, young2.vin4)) {
     young2.valid = true;
     young2.lastReadTime = millis();
@@ -199,14 +198,11 @@ void displayAllData() {
   Serial.println("└────────────────────────────────────────────────┘");
   
   // Young Sensor #1 Data (from ASCII polling)
-  Serial.println("\n┌─ Young #1 (Wind Sensor) [ASCII 'A'] ──────────┐");
+  Serial.println("\n┌─ Young #1 (Temperature Sensor) [ASCII 'A'] ────┐");
   if (young1.valid) {
-    Serial.print("│  Wind Speed:     ");
-    Serial.print(young1.windSpeed, 2);
-    Serial.println(" m/s");
-    Serial.print("│  Wind Direction: ");
-    Serial.print(young1.windDirection, 1);
-    Serial.println(" degrees");
+    Serial.print("│  Temperature: ");
+    Serial.print(young1.temperature, 2);
+    Serial.println(" °C");
     Serial.print("│  VIN1: ");
     Serial.print(young1.vin1);
     Serial.print("  VIN2: ");
@@ -221,14 +217,11 @@ void displayAllData() {
   Serial.println("└────────────────────────────────────────────────┘");
   
   // Young Sensor #2 Data (from ASCII polling)
-  Serial.println("\n┌─ Young #2 (Wind Sensor) [ASCII 'B'] ──────────┐");
+  Serial.println("\n┌─ Young #2 (Temperature Sensor) [ASCII 'B'] ────┐");
   if (young2.valid) {
-    Serial.print("│  Wind Speed:     ");
-    Serial.print(young2.windSpeed, 2);
-    Serial.println(" m/s");
-    Serial.print("│  Wind Direction: ");
-    Serial.print(young2.windDirection, 1);
-    Serial.println(" degrees");
+    Serial.print("│  Temperature: ");
+    Serial.print(young2.temperature, 2);
+    Serial.println(" °C");
     Serial.print("│  VIN1: ");
     Serial.print(young2.vin1);
     Serial.print("  VIN2: ");
